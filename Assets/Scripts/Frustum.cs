@@ -6,49 +6,8 @@ public class Frustum : MonoBehaviour {
     [SerializeField]
     private Camera mainCamera;
 
-    [SerializeField] private List<GameObject> objectsToCull;
-
-    private void CullObjects() {
-        foreach (GameObject obj in objectsToCull) {
-            BoxCollider boundingBox = obj.GetComponent<BoxCollider>();
-            if (!boundingBox) {
-                Debug.LogError("Object " + obj.name + " does not have a BoxCollider component.");
-                continue;
-            }
-
-            Debug.Log("["+ obj.name + "] Position: " + obj.transform.position);
-
-            // Si una de las aristas de la boundingBox se encuentra dentro del frustum.
-
-            Vector3[] vertices = GetBoundingBoxVertices(boundingBox);
-
-            if (IsAnyVertexInFrustum(vertices))
-            {
-                Debug.Log("[" + obj.name + "] esta adentro.");
-            }
-
-        }
-    }
-
-    private Vector3[] GetBoundingBoxVertices(BoxCollider collider)
-    {
-        Vector3[] vertices = new Vector3[8];
-
-        Vector3 center = collider.transform.TransformPoint(collider.center);
-        Vector3 extents = collider.size / 2f;
-
-        // Calculate the vertices of the bounding box
-        vertices[0] = center + new Vector3(extents.x, extents.y, extents.z);
-        vertices[1] = center + new Vector3(-extents.x, extents.y, extents.z);
-        vertices[2] = center + new Vector3(extents.x, -extents.y, extents.z);
-        vertices[3] = center + new Vector3(-extents.x, -extents.y, extents.z);
-        vertices[4] = center + new Vector3(extents.x, extents.y, -extents.z);
-        vertices[5] = center + new Vector3(-extents.x, extents.y, -extents.z);
-        vertices[6] = center + new Vector3(extents.x, -extents.y, -extents.z);
-        vertices[7] = center + new Vector3(-extents.x, -extents.y, -extents.z);
-
-        return vertices;
-    }
+    [SerializeField] 
+    private List<GameObject> objectsToCull;
 
     private bool IsAnyVertexInFrustum(Vector3[] vertices)
     {
@@ -74,6 +33,55 @@ public class Frustum : MonoBehaviour {
         }
 
         return false;
+    }
+
+    private Vector3[] GetBoundingBoxVertices(BoxCollider collider)
+    {
+        Vector3[] vertices = new Vector3[8];
+
+        Vector3 center = collider.transform.TransformPoint(collider.center);
+        Vector3 extents = collider.size / 2f;
+
+        // Calculate the vertices of the bounding box
+        vertices[0] = center + new Vector3(extents.x, extents.y, extents.z);
+        vertices[1] = center + new Vector3(-extents.x, extents.y, extents.z);
+        vertices[2] = center + new Vector3(extents.x, -extents.y, extents.z);
+        vertices[3] = center + new Vector3(-extents.x, -extents.y, extents.z);
+        vertices[4] = center + new Vector3(extents.x, extents.y, -extents.z);
+        vertices[5] = center + new Vector3(-extents.x, extents.y, -extents.z);
+        vertices[6] = center + new Vector3(extents.x, -extents.y, -extents.z);
+        vertices[7] = center + new Vector3(-extents.x, -extents.y, -extents.z);
+
+        return vertices;
+    }
+
+    private void CullObjects() {
+        foreach (GameObject obj in objectsToCull) {
+            BoxCollider boundingBox = obj.GetComponent<BoxCollider>();
+            if (!boundingBox) {
+                Debug.LogError("Object " + obj.name + " does not have a BoxCollider component.");
+                continue;
+            }
+            MeshRenderer mr = obj.GetComponent<MeshRenderer>();
+            if (!mr)
+            {
+                Debug.LogWarning("Object " + obj.name + " is not rendering a 3D model. (Mesh is missing)");
+                continue;
+            }
+
+            Vector3[] vertices = GetBoundingBoxVertices(boundingBox);
+
+            if (IsAnyVertexInFrustum(vertices)) // Verificamos si alguno de los verices de la bounding box se encuentra dentro del frustum.
+            {
+                mr.enabled = true;
+
+            }
+            else
+            {
+                mr.enabled = false; // Si la bounding box esta fuera del frustum, no dibujamos el modelo.
+            }
+
+        }
     }
 
     private void Awake()
