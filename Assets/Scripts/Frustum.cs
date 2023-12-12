@@ -12,7 +12,8 @@ public class Frustum : MonoBehaviour {
 
     private bool IsAnyVertexInFrustum(Vector3[] vertices)
     {
-        Plane[] frustumPlanes = GeometryUtility.CalculateFrustumPlanes(mainCamera);
+        //Plane[] frustumPlanes = GeometryUtility.CalculateFrustumPlanes(mainCamera);
+        Plane[] frustumPlanes = CalculateFrustumPlanes(mainCamera);
 
         foreach (Vector3 vertex in vertices)
         {
@@ -152,6 +153,51 @@ public class Frustum : MonoBehaviour {
             }
 
         }
+    }
+
+    private Plane[] CalculateFrustumPlanes(Camera camera)
+    {
+        Plane[] frustumPlanes = new Plane[6];
+
+        float nearDistance = camera.nearClipPlane;
+        float farDistance = camera.farClipPlane;
+        float aspectRatio = camera.aspect;
+        float fov = camera.fieldOfView;
+
+        // Half height and half width at the near plane
+        float halfHeightNear = Mathf.Tan(Mathf.Deg2Rad * (fov / 2.0f)) * nearDistance;
+        float halfWidthNear = halfHeightNear * aspectRatio;
+
+        // Points
+        Vector3 nearCenter = camera.transform.position + camera.transform.forward * nearDistance;
+        Vector3 farCenter = camera.transform.position + camera.transform.forward * farDistance;
+
+        Vector3 nearTopLeft = nearCenter - camera.transform.right * halfWidthNear + camera.transform.up * halfHeightNear;
+        Vector3 nearTopRight = nearCenter + camera.transform.right * halfWidthNear + camera.transform.up * halfHeightNear;
+        Vector3 nearBottomLeft = nearCenter - camera.transform.right * halfWidthNear - camera.transform.up * halfHeightNear;
+        Vector3 nearBottomRight = nearCenter + camera.transform.right * halfWidthNear - camera.transform.up * halfHeightNear;
+
+        Vector3 farTopLeft = farCenter - camera.transform.right * halfWidthNear + camera.transform.up * halfHeightNear;
+        Vector3 farTopRight = farCenter + camera.transform.right * halfWidthNear + camera.transform.up * halfHeightNear;
+        Vector3 farBottomLeft = farCenter - camera.transform.right * halfWidthNear - camera.transform.up * halfHeightNear;
+        Vector3 farBottomRight = farCenter + camera.transform.right * halfWidthNear - camera.transform.up * halfHeightNear;
+
+        // Planes
+        frustumPlanes[0] = new Plane(nearTopRight, nearTopLeft, nearBottomLeft); // Left
+        frustumPlanes[1] = new Plane(nearBottomLeft, nearBottomRight, nearTopRight); // Right
+        frustumPlanes[2] = new Plane(nearBottomRight, nearTopRight, nearTopLeft); // Top
+        frustumPlanes[3] = new Plane(nearTopLeft, nearBottomLeft, nearBottomRight); // Bottom
+        frustumPlanes[4] = new Plane(nearTopLeft, nearTopRight, farTopRight); // Near
+        frustumPlanes[5] = new Plane(farTopRight, farTopLeft, nearTopLeft); // Far
+
+        for (int i = 0; i < 6; i++)
+        {
+            Vector3 normal = new Vector3(frustumPlanes[i].normal.x, frustumPlanes[i].normal.y, frustumPlanes[i].normal.z);
+            float magnitude = normal.magnitude;
+            frustumPlanes[i] = new Plane(normal / magnitude, frustumPlanes[i].distance / magnitude);
+        }
+
+        return frustumPlanes;
     }
 
     private void Awake()
