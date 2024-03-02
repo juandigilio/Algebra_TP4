@@ -27,10 +27,8 @@ public class Frustum : MonoBehaviour
     public FrustumPlane downPlane = new FrustumPlane();
 
     private List<Vector3> vertexList = new List<Vector3>();
-    private List<FrustumPlane> planes = new List<FrustumPlane>();
 
-    public Transform centerNear;
-    public Transform centerFar;
+    private List<FrustumPlane> planes = new List<FrustumPlane>();
 
     public int screenWidth;
     public int screenHeight;
@@ -59,16 +57,13 @@ public class Frustum : MonoBehaviour
 
     private bool IsAnyVertexInFrustum(Vector3[] vertices)
     {
-        //Plane[] frustumPlanes = GeometryUtility.CalculateFrustumPlanes(mainCamera);
-        //Plane[] frustumPlanes = CalculateF0rustumPlanes(mainCamera);
-
         foreach (Vector3 vertex in vertices)
         {
             bool isInsideFrustum = true;
 
             foreach (FrustumPlane plane in planes)
             {
-                if (PlanePointDistance(plane, vertex) < 0)
+                if (PlanePointDistance(plane, vertex) < 0.0f)
                 {
                     isInsideFrustum = false;
                     break;
@@ -201,9 +196,24 @@ public class Frustum : MonoBehaviour
     private void Awake()
     {
         mainCamera = GetComponent<Camera>();
+        CreateNewFrutum();
+        AddVerticesToList();
+        AddPlanesToList();
+
     }
 
     //FrustumGetter
+
+    void CreateNewFrutum()
+    {
+        nearDist = mainCamera.nearClipPlane;
+        farDist = mainCamera.farClipPlane;
+        screenWidth = Screen.width;
+        screenHeight = Screen.height;
+        aspectRatio = (float)screenWidth / (float)screenHeight;
+        fov = mainCamera.fieldOfView;
+        vFov = fov / aspectRatio;
+    }
 
     void UpdatePoints()
     {
@@ -211,21 +221,21 @@ public class Frustum : MonoBehaviour
 
         vFov = fov / aspectRatio;
 
+
+
         Vector3 up = transform.up;
         Vector3 right = transform.right;
 
         nearCenter = transform.position + transform.forward * nearDist;
         farCenter = transform.position + transform.forward * farDist;
 
-        //Los cubos en los centros de los planos far and near
-        centerNear.transform.position = nearCenter;
-        centerFar.transform.position = farCenter;
 
-        float nearPlaneHeight = Mathf.Tan((vFov) * Mathf.Deg2Rad) * nearDist;
-        float nearPlaneWidth = Mathf.Tan((fov) * Mathf.Deg2Rad) * nearDist;
+        float nearPlaneHeight = Mathf.Tan((vFov * 0.5f) * Mathf.Deg2Rad) * nearDist * 2f;
+        float nearPlaneWidth = nearPlaneHeight * aspectRatio;
 
-        float farPlaneHeight = Mathf.Tan((vFov) * Mathf.Deg2Rad) * farDist;
-        float farPlaneWidth = Mathf.Tan((fov) * Mathf.Deg2Rad) * farDist;
+        float farPlaneHeight = Mathf.Tan((vFov * 0.5f) * Mathf.Deg2Rad) * farDist * 2f;
+        float farPlaneWidth = farPlaneHeight * aspectRatio;
+
 
         //Up, Right y Forward son vectores3 que van desde el 0 del objeto hasta un punto. Cuando yo roto mi figura el punto al que se dirige cada vector también cambia, y no mantiene el 1
         //en una sola coordenada determinada (x=right, y=up, z=forward), sino que cada uno puede tener valores en las 3 coordenadas a la vez (con la magnitud siendo 1).
@@ -329,24 +339,6 @@ public class Frustum : MonoBehaviour
         vertexList[17] = nearDownLeftV;
     }
 
-    void DrawFrustum()
-    {
-        Gizmos.DrawLine(nearUpRightV, farUpRightV);
-        Gizmos.DrawLine(nearUpLeftV, farUpLeftV);
-        Gizmos.DrawLine(farUpRightV, farUpLeftV);
-        Gizmos.DrawLine(nearUpRightV, nearUpLeftV);
-
-        Gizmos.DrawLine(nearDownRightV, farDownRightV);
-        Gizmos.DrawLine(nearDownLeftV, farDownLeftV);
-        Gizmos.DrawLine(farDownRightV, farDownLeftV);
-        Gizmos.DrawLine(nearDownRightV, nearDownLeftV);
-
-        Gizmos.DrawLine(nearDownRightV, nearUpRightV);
-        Gizmos.DrawLine(nearDownLeftV, nearUpLeftV);
-        Gizmos.DrawLine(farDownRightV, farUpRightV);
-        Gizmos.DrawLine(farDownLeftV, farUpLeftV);
-    }
-
     void AddPlanesToList()
     {
         planes.Add(upPlane);
@@ -394,14 +386,34 @@ public class Frustum : MonoBehaviour
         return dist;
     }
 
+    void OnDrawGizmos()
+    {
+        UpdatePoints();  // Make sure the frustum points are up-to-date
+        Gizmos.color = Color.green;  // Set Gizmos color
+
+        // Draw the frustum lines
+        Gizmos.DrawLine(nearUpRightV, farUpRightV);
+        Gizmos.DrawLine(nearUpLeftV, farUpLeftV);
+        Gizmos.DrawLine(farUpRightV, farUpLeftV);
+        Gizmos.DrawLine(nearUpRightV, nearUpLeftV);
+
+        Gizmos.DrawLine(nearDownRightV, farDownRightV);
+        Gizmos.DrawLine(nearDownLeftV, farDownLeftV);
+        Gizmos.DrawLine(farDownRightV, farDownLeftV);
+        Gizmos.DrawLine(nearDownRightV, nearDownLeftV);
+
+        Gizmos.DrawLine(nearDownRightV, nearUpRightV);
+        Gizmos.DrawLine(nearDownLeftV, nearUpLeftV);
+        Gizmos.DrawLine(farDownRightV, farUpRightV);
+        Gizmos.DrawLine(farDownLeftV, farUpLeftV);
+    }
+
     private void Update()
     {
         UpdatePoints();
-        AddVerticesToList();
         UpdateVertex();
-        DrawFrustum();
-        AddPlanesToList();
         UpdatePlanes();
+
         CullObjects();
     }
 }
