@@ -1,27 +1,74 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using System.Threading.Tasks;
 
-public class Frustum : MonoBehaviour {
+public class Frustum : MonoBehaviour 
+{
     [SerializeField]
     private Camera mainCamera;
 
     [SerializeField] 
     private List<GameObject> objectsToCull;
 
+    public class FrustumPlane
+    {
+        public Vector3 vertexA;
+        public Vector3 vertexB;
+        public Vector3 vertexC;
+
+        public Vector3 normal;
+    }
+
+    public FrustumPlane nearPlane = new FrustumPlane();
+    public FrustumPlane farPlane = new FrustumPlane();
+
+    public FrustumPlane leftPlane = new FrustumPlane();
+    public FrustumPlane rightPlane = new FrustumPlane();
+    public FrustumPlane upPlane = new FrustumPlane();
+    public FrustumPlane downPlane = new FrustumPlane();
+
+    private List<Vector3> vertexList = new List<Vector3>();
+    private List<FrustumPlane> planes = new List<FrustumPlane>();
+
+    public Transform centerNear;
+    public Transform centerFar;
+
+    public int screenWidth;
+    public int screenHeight;
+    private float aspectRatio;
+
+    public float fov;
+    private float vFov;
+
+    public float farDist;
+    public float nearDist;
+
+    private Vector3 nearCenter;
+    private Vector3 farCenter;
+
+    private Vector3 farUpRightV;
+    private Vector3 farUpLeftV;
+    private Vector3 farDownRightV;
+    private Vector3 farDownLeftV;
+
+    private Vector3 nearUpRightV;
+    private Vector3 nearUpLeftV;
+    private Vector3 nearDownRightV;
+    private Vector3 nearDownLeftV;
+
+
+
     private bool IsAnyVertexInFrustum(Vector3[] vertices)
     {
         //Plane[] frustumPlanes = GeometryUtility.CalculateFrustumPlanes(mainCamera);
-        Plane[] frustumPlanes = CalculateFrustumPlanes(mainCamera);
+        //Plane[] frustumPlanes = CalculateF0rustumPlanes(mainCamera);
 
         foreach (Vector3 vertex in vertices)
         {
             bool isInsideFrustum = true;
 
-            foreach (Plane plane in frustumPlanes)
+            foreach (FrustumPlane plane in planes)
             {
-                if (plane.GetDistanceToPoint(vertex) < 0)
+                if (PlanePointDistance(plane, vertex) < 0)
                 {
                     isInsideFrustum = false;
                     break;
@@ -111,93 +158,44 @@ public class Frustum : MonoBehaviour {
         return meshVertex;
     }
 
+
     private void CullObjects()
     {
         foreach (GameObject obj in objectsToCull)
         {
             MeshFilter mf = obj.GetComponent<MeshFilter>();
-            if (!mf) 
+            if (!mf)
             {
-                Debug.LogWarning("Object " + obj.name + " does not have a mesh."); // El objeto no tiene ningun modelo.
+                Debug.LogWarning("Object " + obj.name + " does not have a mesh.");
                 continue;
             }
+
             MeshRenderer mr = obj.GetComponent<MeshRenderer>();
             if (!mr)
             {
-                Debug.LogWarning("Object " + obj.name + " does not have a mesh renderer."); // El objeto no se esta dibujando, por lo tanto no es necesario hacer cull.
+                Debug.LogWarning("Object " + obj.name + " does not have a mesh renderer.");
                 continue;
             }
 
-            Vector3[] boundingBoxVertex = GetMeshBoundsVertex(mf.mesh, obj.transform); // Sacamos la bounding box de la mesh.
+            Vector3[] boundingBoxVertex = GetMeshBoundsVertex(mf.mesh, obj.transform);
 
-            if (IsAnyVertexInFrustum(boundingBoxVertex)) // Verificamos si alguno de los verices de la bounding box se encuentra dentro del frustum.
+            if (IsAnyVertexInFrustum(boundingBoxVertex))
             {
-                // Ahora, antes de activar el renderer debemos verificar que uno de los vertices del modelo se encuentre dentro del frustum.
-                Vector3[] meshVertex = GetMeshVertex(mf.mesh, obj.transform); // Sacamos los vertices de la mesh.
-                // (Cabe destacar que mesh tiene mesh.vertices, pero nosotros los necesitamos transformados al transform de nuestro gameObject)
-
-                // Hacemos el segundo checkeo.
+                Vector3[] meshVertex = GetMeshVertex(mf.mesh, obj.transform);
                 if (IsAnyVertexInFrustum(meshVertex))
                 {
-                    mr.enabled = true; // Al menos un vertice de la mesh se encuentra dentro del frustum, activamos el mesh renderer para que se dibuje el modelo.
+                    mr.enabled = true;
                 }
                 else
                 {
-                    mr.enabled = false; // Si ningun vertice de la mesh se encuentra dentro del frustum entonces no lo dibujamos.
+                    mr.enabled = false;
                 }
-
             }
             else
             {
-                mr.enabled = false; // Si la bounding box esta fuera del frustum, no dibujamos el modelo.
+                mr.enabled = false;
             }
-
         }
-    }
-
-    private Plane[] CalculateFrustumPlanes(Camera camera)
-    {
-        Plane[] frustumPlanes = new Plane[6];
-
-        float nearDistance = camera.nearClipPlane;
-        float farDistance = camera.farClipPlane;
-        float aspectRatio = camera.aspect;
-        float fov = camera.fieldOfView;
-
-        // Half height and half width at the near plane
-        float halfHeightNear = Mathf.Tan(Mathf.Deg2Rad * (fov / 2.0f)) * nearDistance;
-        float halfWidthNear = halfHeightNear * aspectRatio;
-
-        // Points
-        Vector3 nearCenter = camera.transform.position + camera.transform.forward * nearDistance;
-        Vector3 farCenter = camera.transform.position + camera.transform.forward * farDistance;
-
-        Vector3 nearTopLeft = nearCenter - camera.transform.right * halfWidthNear + camera.transform.up * halfHeightNear;
-        Vector3 nearTopRight = nearCenter + camera.transform.right * halfWidthNear + camera.transform.up * halfHeightNear;
-        Vector3 nearBottomLeft = nearCenter - camera.transform.right * halfWidthNear - camera.transform.up * halfHeightNear;
-        Vector3 nearBottomRight = nearCenter + camera.transform.right * halfWidthNear - camera.transform.up * halfHeightNear;
-
-        Vector3 farTopLeft = farCenter - camera.transform.right * halfWidthNear + camera.transform.up * halfHeightNear;
-        Vector3 farTopRight = farCenter + camera.transform.right * halfWidthNear + camera.transform.up * halfHeightNear;
-        Vector3 farBottomLeft = farCenter - camera.transform.right * halfWidthNear - camera.transform.up * halfHeightNear;
-        Vector3 farBottomRight = farCenter + camera.transform.right * halfWidthNear - camera.transform.up * halfHeightNear;
-
-        // Planes
-        frustumPlanes[0] = new Plane(nearTopRight, nearTopLeft, nearBottomLeft); // Left
-        frustumPlanes[1] = new Plane(nearBottomLeft, nearBottomRight, nearTopRight); // Right
-        frustumPlanes[2] = new Plane(nearBottomRight, nearTopRight, nearTopLeft); // Top
-        frustumPlanes[3] = new Plane(nearTopLeft, nearBottomLeft, nearBottomRight); // Bottom
-        frustumPlanes[4] = new Plane(nearTopLeft, nearTopRight, farTopRight); // Near
-        frustumPlanes[5] = new Plane(farTopRight, farTopLeft, nearTopLeft); // Far
-
-        for (int i = 0; i < 6; i++)
-        {
-            Vector3 normal = new Vector3(frustumPlanes[i].normal.x, frustumPlanes[i].normal.y, frustumPlanes[i].normal.z);
-            float magnitude = normal.magnitude;
-            frustumPlanes[i] = new Plane(normal / magnitude, frustumPlanes[i].distance / magnitude);
-        }
-
-        return frustumPlanes;
     }
 
     private void Awake()
@@ -205,8 +203,205 @@ public class Frustum : MonoBehaviour {
         mainCamera = GetComponent<Camera>();
     }
 
+    //FrustumGetter
+
+    void UpdatePoints()
+    {
+        aspectRatio = (float)screenWidth / (float)screenHeight;
+
+        vFov = fov / aspectRatio;
+
+        Vector3 up = transform.up;
+        Vector3 right = transform.right;
+
+        nearCenter = transform.position + transform.forward * nearDist;
+        farCenter = transform.position + transform.forward * farDist;
+
+        //Los cubos en los centros de los planos far and near
+        centerNear.transform.position = nearCenter;
+        centerFar.transform.position = farCenter;
+
+        float nearPlaneHeight = Mathf.Tan((vFov) * Mathf.Deg2Rad) * nearDist;
+        float nearPlaneWidth = Mathf.Tan((fov) * Mathf.Deg2Rad) * nearDist;
+
+        float farPlaneHeight = Mathf.Tan((vFov) * Mathf.Deg2Rad) * farDist;
+        float farPlaneWidth = Mathf.Tan((fov) * Mathf.Deg2Rad) * farDist;
+
+        //Up, Right y Forward son vectores3 que van desde el 0 del objeto hasta un punto. Cuando yo roto mi figura el punto al que se dirige cada vector también cambia, y no mantiene el 1
+        //en una sola coordenada determinada (x=right, y=up, z=forward), sino que cada uno puede tener valores en las 3 coordenadas a la vez (con la magnitud siendo 1).
+        //Usando el transform.up y el transform.right ademas del forward de antes para conseguir los vertices logro tener las posiciones relativas al objeto, no del ambito global
+        nearUpLeftV.x = nearCenter.x + (up.x * nearPlaneHeight / 2) - (right.x * nearPlaneWidth / 2);
+        nearUpLeftV.y = nearCenter.y + (up.y * nearPlaneHeight / 2) - (right.y * nearPlaneWidth / 2);
+        nearUpLeftV.z = nearCenter.z + (up.z * nearPlaneHeight / 2) - (right.z * nearPlaneWidth / 2);
+
+        nearUpRightV.x = nearCenter.x + (up.x * nearPlaneHeight / 2) + (right.x * nearPlaneWidth / 2);
+        nearUpRightV.y = nearCenter.y + (up.y * nearPlaneHeight / 2) + (right.y * nearPlaneWidth / 2);
+        nearUpRightV.z = nearCenter.z + (up.z * nearPlaneHeight / 2) + (right.z * nearPlaneWidth / 2);
+
+        nearDownLeftV.x = nearCenter.x - (up.x * nearPlaneHeight / 2) - (right.x * nearPlaneWidth / 2);
+        nearDownLeftV.y = nearCenter.y - (up.y * nearPlaneHeight / 2) - (right.y * nearPlaneWidth / 2);
+        nearDownLeftV.z = nearCenter.z - (up.z * nearPlaneHeight / 2) - (right.z * nearPlaneWidth / 2);
+
+        nearDownRightV.x = nearCenter.x - (up.x * nearPlaneHeight / 2) + (right.x * nearPlaneWidth / 2);
+        nearDownRightV.y = nearCenter.y - (up.y * nearPlaneHeight / 2) + (right.y * nearPlaneWidth / 2);
+        nearDownRightV.z = nearCenter.z - (up.z * nearPlaneHeight / 2) + (right.z * nearPlaneWidth / 2);
+
+        farUpLeftV.x = farCenter.x + (up.x * farPlaneHeight / 2) - (right.x * farPlaneWidth / 2);
+        farUpLeftV.y = farCenter.y + (up.y * farPlaneHeight / 2) - (right.y * farPlaneWidth / 2);
+        farUpLeftV.z = farCenter.z + (up.z * farPlaneHeight / 2) - (right.z * farPlaneWidth / 2);
+
+        farUpRightV.x = farCenter.x + (up.x * farPlaneHeight / 2) + (right.x * farPlaneWidth / 2);
+        farUpRightV.y = farCenter.y + (up.y * farPlaneHeight / 2) + (right.y * farPlaneWidth / 2);
+        farUpRightV.z = farCenter.z + (up.z * farPlaneHeight / 2) + (right.z * farPlaneWidth / 2);
+
+        farDownLeftV.x = farCenter.x - (up.x * farPlaneHeight / 2) - (right.x * farPlaneWidth / 2);
+        farDownLeftV.y = farCenter.y - (up.y * farPlaneHeight / 2) - (right.y * farPlaneWidth / 2);
+        farDownLeftV.z = farCenter.z - (up.z * farPlaneHeight / 2) - (right.z * farPlaneWidth / 2);
+
+        farDownRightV.x = farCenter.x - (up.x * farPlaneHeight / 2) + (right.x * farPlaneWidth / 2);
+        farDownRightV.y = farCenter.y - (up.y * farPlaneHeight / 2) + (right.y * farPlaneWidth / 2);
+        farDownRightV.z = farCenter.z - (up.z * farPlaneHeight / 2) + (right.z * farPlaneWidth / 2);
+    }
+
+    void AddVerticesToList()
+    {
+        //Triangulo superior
+        vertexList.Add(transform.position);
+        vertexList.Add(farUpRightV);
+        vertexList.Add(farUpLeftV);
+
+        //Triangulo derecho
+        vertexList.Add(transform.position);
+        vertexList.Add(farUpRightV);
+        vertexList.Add(farDownRightV);
+
+        //Triangulo inferior
+        vertexList.Add(transform.position);
+        vertexList.Add(farDownRightV);
+        vertexList.Add(farDownLeftV);
+
+        //Triangulo izquierdo
+        vertexList.Add(transform.position);
+        vertexList.Add(farUpLeftV);
+        vertexList.Add(farDownLeftV);
+
+        //Triangulo del far plane
+        vertexList.Add(farUpRightV);
+        vertexList.Add(farDownRightV);
+        vertexList.Add(farDownLeftV);
+
+        //Triangulo del near plane
+        vertexList.Add(nearUpRightV);
+        vertexList.Add(nearDownRightV);
+        vertexList.Add(nearDownLeftV);
+    }
+
+    void UpdateVertex()
+    {
+        //Update triangulo superior
+        vertexList[0] = nearUpRightV;
+        vertexList[1] = farUpRightV;
+        vertexList[2] = farUpLeftV;
+
+        //Update triangulo derecho
+        vertexList[3] = nearUpRightV;
+        vertexList[4] = farUpRightV;
+        vertexList[5] = farDownRightV;
+
+        //Update triangulo inferior
+        vertexList[6] = nearDownLeftV;
+        vertexList[7] = farDownRightV;
+        vertexList[8] = farDownLeftV;
+
+        //Update triangulo izquierdo
+        vertexList[9] = nearDownLeftV;
+        vertexList[10] = farUpLeftV;
+        vertexList[11] = farDownLeftV;
+
+        //Update triangulo del far plane
+        vertexList[12] = farUpRightV;
+        vertexList[13] = farDownRightV;
+        vertexList[14] = farDownLeftV;
+
+        //Update triangulo del near plane
+        vertexList[15] = nearUpRightV;
+        vertexList[16] = nearDownRightV;
+        vertexList[17] = nearDownLeftV;
+    }
+
+    void DrawFrustum()
+    {
+        Gizmos.DrawLine(nearUpRightV, farUpRightV);
+        Gizmos.DrawLine(nearUpLeftV, farUpLeftV);
+        Gizmos.DrawLine(farUpRightV, farUpLeftV);
+        Gizmos.DrawLine(nearUpRightV, nearUpLeftV);
+
+        Gizmos.DrawLine(nearDownRightV, farDownRightV);
+        Gizmos.DrawLine(nearDownLeftV, farDownLeftV);
+        Gizmos.DrawLine(farDownRightV, farDownLeftV);
+        Gizmos.DrawLine(nearDownRightV, nearDownLeftV);
+
+        Gizmos.DrawLine(nearDownRightV, nearUpRightV);
+        Gizmos.DrawLine(nearDownLeftV, nearUpLeftV);
+        Gizmos.DrawLine(farDownRightV, farUpRightV);
+        Gizmos.DrawLine(farDownLeftV, farUpLeftV);
+    }
+
+    void AddPlanesToList()
+    {
+        planes.Add(upPlane);
+        planes.Add(rightPlane);
+        planes.Add(downPlane);
+        planes.Add(leftPlane);
+
+        planes.Add(farPlane);
+        planes.Add(nearPlane);
+    }
+
+    void UpdatePlanes()
+    {
+        Vector3 point = transform.position + transform.forward * ((farDist - nearDist) / 2 + nearDist); //Punto en el centro de la figura
+
+        for (int i = 0; i < planes.Count; i++)
+        {
+            planes[i].vertexA = vertexList[i * 3 + 0];
+            planes[i].vertexB = vertexList[i * 3 + 1];
+            planes[i].vertexC = vertexList[i * 3 + 2];
+
+            Vector3 vectorAB = planes[i].vertexB - planes[i].vertexA;
+            Vector3 vectorAC = planes[i].vertexC - planes[i].vertexA;
+
+            Vector3 normalPlane = Vector3.Cross(vectorAB, vectorAC).normalized; //Calcula la normal con producto cruz y la normaliza
+
+            //Verifica la orientación y la cambia en caso de que no sea hacia el centro
+            Vector3 vectorToPlane = point - planes[i].vertexA;
+            float distanceToPlane = Vector3.Dot(vectorToPlane, normalPlane); //Si > 0 apuntan hacia el mismo lado (el centro), sino no
+
+            if (distanceToPlane > 0.0f) //Si es mayor que cero mantengo la dirección porque esta hacia el centro
+            {
+                planes[i].normal = normalPlane;
+            }
+            else //Si apunta hacia diferente lado la multiplico por -1 para invertir su dirección porque significa que estaba hacia afuera
+            {
+                planes[i].normal = normalPlane * -1;
+            }
+        }
+    }
+
+    float PlanePointDistance(FrustumPlane plane, Vector3 pointToCheck)
+    {
+        float dist = Vector3.Dot(plane.normal, (pointToCheck - plane.vertexA));
+        return dist;
+    }
+
     private void Update()
     {
+        UpdatePoints();
+        AddVerticesToList();
+        UpdateVertex();
+        DrawFrustum();
+        AddPlanesToList();
+        UpdatePlanes();
         CullObjects();
     }
 }
